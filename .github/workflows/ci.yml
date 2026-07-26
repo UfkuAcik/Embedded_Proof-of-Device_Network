@@ -1,0 +1,194 @@
+name: EPDN CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: epdn-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  PYTHONUTF8: "1"
+  RUST_TOOLCHAIN: "1.85.0"
+
+jobs:
+  rust:
+    name: Rust workspace
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Install stable Rust
+        run: >-
+          rustup toolchain install "$RUST_TOOLCHAIN"
+          --profile minimal
+          --component rustfmt,clippy
+      - run: rustup default "$RUST_TOOLCHAIN"
+      - name: Build workspace
+        run: cargo build --locked --workspace --all-targets
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: Dependency vulnerability audit
+        run: |
+          cargo install cargo-audit --locked --version 0.22.0
+          cargo audit
+      - name: Rust/Arduino protocol vectors
+        run: cargo test --locked -p epdn-protocol --test vectors
+      - name: Tests
+        run: cargo test --locked --workspace --no-fail-fast
+
+  python:
+    name: Python CLIs and indexer
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install hash-locked Python dependencies
+        run: python -m pip install --require-hashes -r requirements/ci.lock
+      - name: Install local packages without dependency resolution
+        run: >-
+          python -m pip install --no-deps --no-build-isolation
+          -e "./provisioning"
+          -e "./gateway"
+          -e "./indexer"
+      - name: Import/bytecode check
+        run: python -m compileall -q provisioning gateway indexer scripts/testnet.py
+      - name: Tests
+        run: python -m pytest -q provisioning/tests gateway/tests indexer/tests
+      - name: Dependency vulnerability audit
+        run: python -m pip_audit --local
+
+  dashboard:
+    name: Dashboard PWA
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Build and security-contract tests
+        run: npm test
+      - name: Production dependency vulnerability audit
+        run: npm audit --omit=dev --audit-level=high
+
+  secrets:
+    name: Secret leakage guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - name: Test secret scanner
+        run: python -m unittest discover -s scripts/tests -p "test_*.py"
+      - name: Scan current tree and Git history
+        run: python scripts/check-secrets.py --history
+
+  arduino:
+    name: Arduino ESP32 compile matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: arduino/setup-arduino-cli@81d310742121c928ea9c8bbd407b4217b432ae02 # v2
+        with:
+          version: "1.5.0"
+      - name: Install pinned ESP32 core
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls \
+            https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@2.0.11
+      - name: Compile supported examples
+        shell: bash
+        run: |
+          set -euo pipefail
+          for sketch in \
+            SecurityDiagnostic \
+            GatewayMiner \
+            SerialProvisioning \
+            WiFiMiner \
+            ProtocolTestVectors \
+            SecureElementMiner
+          do
+            arduino-cli compile \
+              --fqbn esp32:esp32:esp32 \
+              --libraries arduino/libraries \
+              "arduino/examples/${sketch}"
+          done
+      - name: Compile Wi-Fi miner for additional ESP32 targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in esp32s2 esp32s3 esp32c3
+          do
+            arduino-cli compile \
+              --fqbn "esp32:esp32:${target}" \
+              --libraries arduino/libraries \
+              --build-path "${RUNNER_TEMP}/epdn-${target}" \
+              arduino/examples/WiFiMiner
+          done
+      - name: Production build refuses L0 backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          if arduino-cli compile \
+            --fqbn esp32:esp32:esp32 \
+            --libraries arduino/libraries \
+            --build-property "compiler.cpp.extra_flags=-DEPDN_PRODUCTION_BUILD -DEPDN_IDENTITY_BACKEND=0" \
+            arduino/examples/WiFiMiner
+          then
+            echo "L0 production compile unexpectedly succeeded" >&2
+            exit 1
+          fi
+          echo "L0 production compile was rejected as required."
+
+  local-testnet:
+    name: Three-process local testnet smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Install stable Rust
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+      - run: rustup default "$RUST_TOOLCHAIN"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - name: API processes and deterministic agreement
+        run: python scripts/testnet.py --ports 18745,18746,18747 smoke
+
+  container:
+    name: Node container build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Build testnet node image
+        run: docker build --tag epdn-node:ci .

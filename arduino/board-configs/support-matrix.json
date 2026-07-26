@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "privacy": {
+    "exact_hardware_details_omitted": true,
+    "unique_identifiers_included": false,
+    "raw_security_posture_included": false
+  },
+  "physically_tested": [
+    {
+      "family": "Classic ESP32",
+      "fqbn": "esp32:esp32:esp32",
+      "board_model": "omitted",
+      "evidence": "sanitized diagnostic, Rust-Arduino protocol vector, and proof-exclusion UART gateway E2E",
+      "miner_e2e": "pass-uart-gateway",
+      "wifi_e2e": "not-run-no-credentials",
+      "node_restart_persistence": "historical-pass-epsj-v2-v3-hardware-rerun-pending"
+    }
+  ],
+  "compile_targets": [
+    {
+      "family": "ESP32",
+      "fqbn": "esp32:esp32:esp32",
+      "status": "compile-target",
+      "identity": "development-only",
+      "board_model": "not-asserted"
+    }
+  ],
+  "planned": [
+    "ESP32-S2",
+    "ESP32-S3",
+    "ESP32-C2",
+    "ESP32-C3",
+    "ESP32-C5",
+    "ESP32-C6",
+    "ESP32-C61",
+    "ESP32-H2",
+    "ESP32-P4",
+    "ESP8266",
+    "RP2040/Pico W",
+    "SAMD",
+    "STM32",
+    "Renesas",
+    "ATECC608A"
+  ],
+  "notes": [
+    "A generic FQBN or USB bridge does not prove an exact board model.",
+    "No target is physically tested until sanitized diagnostic evidence is captured.",
+    "Unsupported identity backends fail closed and never silently downgrade.",
+    "Ticket eligibility excludes ECDSA proof bytes to prevent nonce grinding.",
+    "Non-empty unsigned EPSJ V2 restart passed historically; signed V3 has automated coverage and still needs a physical rerun."
+  ],
+  "compile_results": [
+    {
+      "example": "SecurityDiagnostic",
+      "fqbn": "esp32:esp32:esp32",
+      "status": "pass",
+      "hardware_execution": "pass"
+    },
+    {
+      "example": "GatewayMiner",
+      "fqbn": "esp32:esp32:esp32",
+      "status": "pass",
+      "hardware_execution": "pass"
+    },
+    {
+      "example": "SerialProvisioning",
+      "fqbn": "esp32:esp32:esp32",
+      "status": "pass"
+    },
+    {
+      "example": "WiFiMiner",
+      "fqbn": "esp32:esp32:esp32",
+      "status": "pass",
+      "hardware_execution": "not-run-no-credentials"
+    },
+    {
+      "example": "ProtocolTestVectors",
+      "fqbn": "esp32:esp32:esp32",
+      "status": "pass",
+      "hardware_execution": "pass-all-stages"
+    },
+    {
+      "example": "SecureElementMiner",
+      "fqbn": "esp32:esp32:esp32",
+      "status": "pass",
+      "hardware_execution": "not-run-fail-closed-placeholder"
+    }
+  ],
+  "host_tests": [
+    {
+      "suite": "provisioning tests",
+      "status": "pass"
+    },
+    {
+      "suite": "gateway tests",
+      "status": "pass"
+    },
+    {
+      "suite": "Rust-Arduino test-vector constants",
+      "status": "pass",
+      "hardware_execution": "pass"
+    }
+  ],
+  "physical_uart_gateway_tests": [
+    {
+      "case": "final proof-exclusion protocol vector",
+      "result": "pass",
+      "detail": "all non-secret protocol-vector stages passed on physical hardware"
+    },
+    {
+      "case": "unregistered participant",
+      "result": "pass",
+      "http_status": 404,
+      "node_error": "unregistered_device"
+    },
+    {
+      "case": "ticket acceptance",
+      "result": "pass",
+      "http_status": 200
+    },
+    {
+      "case": "same-boot retry cache",
+      "result": "pass",
+      "detail": "the canonical challenge returned byte-identical cached submission data without another persistent write"
+    },
+    {
+      "case": "duplicate submission",
+      "result": "pass",
+      "http_status": 409,
+      "node_error": "duplicate_submission"
+    },
+    {
+      "case": "block and reward",
+      "result": "pass"
+    },
+    {
+      "case": "revoked device",
+      "result": "pass",
+      "post_revocation_ticket_http_status": 403,
+      "node_error": "revoked_device"
+    },
+    {
+      "case": "node restart persistence",
+      "result": "historical-pass-v2-v3-hardware-rerun-pending",
+      "journal_format": "EPSJ",
+      "historically_tested_journal_version": 2,
+      "current_journal_version": 3
+    },
+    {
+      "case": "physical identity continuity",
+      "result": "pass",
+      "detail": "identity continuity was verified without publishing identifier or certificate values"
+    },
+    {
+      "case": "local CORS policy",
+      "result": "pass",
+      "detail": "localhost origin allow policy matched exactly"
+    }
+  ]
+}

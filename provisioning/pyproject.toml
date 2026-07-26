@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68,<84"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "epdn-provisioning"
+version = "0.1.0"
+description = "Fail-closed development provisioning CLI for EPDN devices"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = ["pyserial==3.5"]
+
+[project.optional-dependencies]
+crypto = ["cryptography>=42,<50"]
+test = ["pytest>=8,<10"]
+
+[project.scripts]
+epdn-provision = "epdn_provisioning.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["epdn_provisioning*"]

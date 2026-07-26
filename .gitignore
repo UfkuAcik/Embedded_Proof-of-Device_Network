@@ -1,0 +1,89 @@
+# Local secrets: never commit these files.
+.env
+.env.*
+!.env.example
+secrets/
+**/secrets/
+**/wifi.local.json
+**/secrets_local.h
+**/generated/secrets_local.h
+**/*.private.pem
+**/*.private.key
+**/*.p12
+**/*.pfx
+**/device-identity.json
+**/development-ca/
+
+# Local deployment binding; keep it on the workstation, not in Git.
+/dashboard/.openai/hosting.json
+
+# Rust
+target/
+**/target/
+Cargo.lock.bak
+
+# JavaScript / TypeScript
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+.vinext/
+**/.vinext/
+dist/
+**/dist/
+coverage/
+**/coverage/
+.wrangler/
+**/.wrangler/
+dashboard/outputs/
+dashboard/work/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Arduino / PlatformIO / ESP tooling
+arduino/.build/
+arduino/generated/
+*.bin
+*.elf
+*.map
+*.hex
+*.uf2
+
+# Local node, gateway, and testnet state
+data/
+**/data/
+.epdn/
+testnet/state/
+testnet/logs/
+*.pid
+*.sqlite
+*.sqlite3
+*.db
+
+# Provisioning and hardware captures may contain identifiers or credentials.
+provisioning/state/
+provisioning/.state/
+tests/hardware/results/local/
+hardware-logs/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and transient output
+*.log
+tmp/
+temp/

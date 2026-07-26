@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68,<84"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "epdn-gateway"
+version = "0.1.0"
+description = "Bounded UART byte relay for EPDN miners"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = ["pyserial==3.5"]
+
+[project.scripts]
+epdn-gateway = "epdn_gateway.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["epdn_gateway*"]

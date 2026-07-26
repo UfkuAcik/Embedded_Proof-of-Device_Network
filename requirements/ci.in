@@ -1,0 +1,6 @@
+# Direct CI/runtime inputs. See README.md for the reproducible update command.
+cryptography==49.0.0
+pip-audit==2.10.1
+pyserial==3.5
+pytest==9.1.1
+setuptools==83.0.0

@@ -1,0 +1,4 @@
+{"component":"epdn-diagnostic","event":"start"}
+{"target_family":"classic-esp32","transport":"local-uart","exact_hardware_details_omitted":true}
+{"diagnostic_completed":true,"irreversible_operation_performed":false}
+{"identity_material_included":false,"network_identifiers_included":false,"raw_security_posture_included":false}

@@ -1,0 +1,45 @@
+[package]
+name = "epdn-protocol-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+epdn-protocol = { path = ".." }
+libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "epoch_challenge_decode"
+path = "fuzz_targets/epoch_challenge_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "device_certificate_decode"
+path = "fuzz_targets/device_certificate_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ticket_submission_decode"
+path = "fuzz_targets/ticket_submission_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "signed_transfer_decode"
+path = "fuzz_targets/signed_transfer_decode.rs"
+test = false
+doc = false
+bench = false
+
+# Keep cargo-fuzz isolated from the repository workspace. This avoids making
+# libfuzzer a dependency of normal builds and tests.
+[workspace]
+members = ["."]
