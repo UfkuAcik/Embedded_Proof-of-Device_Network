@@ -1,7 +1,8 @@
 # Embedded Proof-of-Device Network (EPDN)
 
-**An open-source MVP exploring how registered embedded devices can participate
-in a test network without competing on compute power.**
+**An open-source MVP exploring how registered embedded devices can participate in a test network without competing on compute power.**
+
+> New to embedded systems, cryptography, or blockchain concepts? Start with the [EPDN Beginner’s Guide](docs/EPDN_BEGINNERS_GUIDE.md) for a plain-language explanation of how the project works.
 
 [![EPDN CI](https://github.com/UfkuAcik/Embedded_Proof-of-Device_Network/actions/workflows/ci.yml/badge.svg)](https://github.com/UfkuAcik/Embedded_Proof-of-Device_Network/actions/workflows/ci.yml)
 ![Status](https://img.shields.io/badge/status-experimental%20MVP-orange)
