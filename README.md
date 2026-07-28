@@ -1,575 +1,585 @@
 # Embedded Proof-of-Device Network (EPDN)
 
-**Kayıtlı gömülü cihazların, işlem gücü yarışı yapmadan bir test ağına
-katılmasını araştıran açık kaynaklı bir MVP.**
+**An open-source MVP exploring how registered embedded devices can participate
+in a test network without competing on compute power.**
 
-[![EPDN CI](https://github.com/UfkuAcik/EPDN-Network/actions/workflows/ci.yml/badge.svg)](https://github.com/UfkuAcik/EPDN-Network/actions/workflows/ci.yml)
-![Durum](https://img.shields.io/badge/durum-deneysel%20MVP-orange)
-![Lisans](https://img.shields.io/badge/lisans-MIT-blue)
+[![EPDN CI](https://github.com/UfkuAcik/Embedded_Proof-of-Device_Network/actions/workflows/ci.yml/badge.svg)](https://github.com/UfkuAcik/Embedded_Proof-of-Device_Network/actions/workflows/ci.yml)
+![Status](https://img.shields.io/badge/status-experimental%20MVP-orange)
+![License](https://img.shields.io/badge/license-MIT-blue)
 ![Rust](https://img.shields.io/badge/validator-Rust-b7410e)
-![Arduino](https://img.shields.io/badge/cihaz-Arduino%20%2F%20ESP32-00979d)
+![Arduino](https://img.shields.io/badge/device-Arduino%20%2F%20ESP32-00979d)
 
-![EPDN Network genel görünümü](dashboard/public/og.png)
+![EPDN Network overview](dashboard/public/og.png)
 
 > [!WARNING]
-> EPDN bir **araştırma ve geliştirme test ağıdır**. Üretim ağı, yatırım ürünü,
-> gerçek değeri olan kripto para veya bağımsız güvenlik denetiminden geçmiş bir
-> sistem değildir. Test anahtarları ve test birimleri gerçek para gibi
-> değerlendirilmemelidir.
+> EPDN is a **research and development test network**. It is not a production
+> network, an investment product, a cryptocurrency with real-world value, or a
+> system that has passed an independent security audit. Test keys and test units
+> must not be treated as real money.
 
-<a id="bir-dakikada-epdn"></a>
-## Bir dakikada EPDN
+<a id="epdn-in-one-minute"></a>
+## EPDN in one minute
 
-EPDN'yi bir çekiliş gibi düşünebilirsiniz:
+You can think of EPDN as a lottery:
 
-1. Bir gömülü cihaz önce ağa kaydedilir.
-2. Ağ, her **30 saniyelik turda** kayıtlı kimliğe en fazla bir bilet hakkı
-   verir.
-3. Cihaz bileti kendi özel anahtarıyla imzalar.
-4. Validator bileti, cihaz sertifikasını ve ağ kurallarını doğrular.
-5. Sayısal puanı en düşük geçerli bilet turu kazanır.
-6. Kazananın belirttiği cüzdan adresine yalnızca test ağında kullanılan ödül
-   yazılır.
+1. An embedded device is first registered with the network.
+2. In each protocol round—designed around a **30-second schedule**—the network
+   allows each registered identity at most one ticket.
+3. The device signs its ticket with its private key.
+4. The validator checks the ticket, the device certificate, and the network
+   rules.
+5. The valid ticket with the lowest numerical score wins the round.
+6. A test-network-only reward is credited to the winner's pre-registered
+   reward address.
 
 ```mermaid
 flowchart LR
-    A["1. Cihaz kaydedilir"] --> B["2. Tur için tek bilet üretir"]
-    B --> C["3. Bileti cihaz imzalar"]
-    C --> D["4. Validator kuralları doğrular"]
-    D --> E["5. En düşük puan kazanır"]
-    E --> F["6. Blok ve test ödülü oluşur"]
+    A["1. Device is registered"] --> B["2. It creates one ticket for the round"]
+    B --> C["3. Device signs the ticket"]
+    C --> D["4. Validator checks the rules"]
+    D --> E["5. Lowest score wins"]
+    E --> F["6. Block and test reward are created"]
 ```
 
-Buradaki önemli fark şudur: klasik Proof of Work sistemlerinde daha fazla işlem
-gücü daha fazla deneme sağlar. EPDN'de aynı kayıtlı kimlik için hızlı işlemci,
-GPU, FPGA veya ASIC kullanmak ek bilet sağlamaz.
+The key difference is that, in classic Proof of Work systems, more compute power
+provides more attempts. In EPDN, using a faster processor, GPU, FPGA, or ASIC
+does not provide extra tickets for the same registered identity.
 
 > [!IMPORTANT]
-> Bu MVP'de “bir cihaz”, teknik olarak **bir kayıtlı kriptografik kimlik**
-> anlamına gelir. Mevcut geliştirme anahtarı kopyalanabilirse iki fiziksel cihaz
-> aynı kimliği kullanabilir. Gerçek fiziksel benzersizlik iddiası için
-> doğrulanmış, dışarı aktarılamayan bir donanım anahtarı gerekir.
+> In this MVP, “one device” technically means **one registered cryptographic
+> identity**. If the current development key can be copied, two physical devices
+> can use the same identity. Claiming true physical uniqueness requires a
+> verified, non-exportable hardware key.
 
-<a id="icindekiler"></a>
-## İçindekiler
+<a id="table-of-contents"></a>
+## Table of contents
 
-- [Bir dakikada EPDN](#bir-dakikada-epdn)
-- [Proje hangi problemi araştırıyor?](#hangi-problem)
-- [EPDN nedir, ne değildir?](#nedir-ne-degildir)
-- [Mevcut durum](#mevcut-durum)
-- [Temel kavramlar sözlüğü](#sozluk)
-- [Sistem mimarisi](#mimari)
-- [Bileşenler ve görevleri](#bilesenler)
-- [Uçtan uca çalışma akışı](#calisma-akisi)
-- [PoPED nasıl çalışır?](#poped)
-- [Bir epoch içinde ne olur?](#epoch)
-- [Cihaz kimliği ile cüzdan neden ayrıdır?](#anahtar-ayrimi)
-- [Donanım desteği](#donanim-destegi)
-- [Güvenlik sınıfları](#guvenlik-siniflari)
-- [Güven ve tehdit modeli](#guven-modeli)
-- [Gizlilik ve veri sınırları](#gizlilik)
-- [Hızlı başlangıç](#hizli-baslangic)
-  - [Yol 1: Yalnızca arayüzü görmek](#arayuz-demo)
-  - [Yol 2: Yerel validator ve dashboard](#yerel-validator)
-  - [Yol 3: Üç süreçli test](#uc-surecli-test)
-  - [Yol 4: ESP32 kodunu derlemek](#esp32-derleme)
-- [Depo yapısı](#depo-yapisi)
-- [API özeti](#api-ozeti)
-- [Testler ve kalite kapıları](#testler)
-- [Bilinen sınırlar](#sinirlar)
-- [Belgeler](#belgeler)
-- [Yol haritası](#yol-haritasi)
-- [Katkı ve güvenlik bildirimi](#katki)
-- [Lisans](#lisans)
+- [EPDN in one minute](#epdn-in-one-minute)
+- [What problem does the project explore?](#problem)
+- [What EPDN is—and is not](#what-it-is-and-is-not)
+- [Current status](#current-status)
+- [Glossary of core concepts](#glossary)
+- [System architecture](#architecture)
+- [Components and responsibilities](#components)
+- [End-to-end flow](#end-to-end-flow)
+- [How does PoPED work?](#poped)
+- [What happens during an epoch?](#epoch)
+- [Why are device identity and wallet identity separate?](#key-separation)
+- [Hardware support](#hardware-support)
+- [Security classes](#security-classes)
+- [Trust and threat model](#trust-model)
+- [Privacy and data boundaries](#privacy)
+- [Quick start](#quick-start)
+  - [Path 1: View only the interface](#dashboard-demo)
+  - [Path 2: Local validator and dashboard](#local-validator)
+  - [Path 3: Three-process test](#three-process-test)
+  - [Path 4: Compile the ESP32 code](#esp32-build)
+- [Repository layout](#repository-layout)
+- [API overview](#api-overview)
+- [Tests and quality gates](#tests)
+- [Known limitations](#limitations)
+- [Documentation](#documentation)
+- [Roadmap](#roadmap)
+- [Contributing and security reports](#contributing)
+- [License](#license)
 
 ---
 
-<a id="hangi-problem"></a>
-## Proje hangi problemi araştırıyor?
+<a id="problem"></a>
+## What problem does the project explore?
 
-Birçok blokzincir sistemi katılımcıları işlem gücü, para veya başka bir kıt
-kaynak üzerinden sınırlar. EPDN şu soruyu araştırır:
+Many blockchain systems limit participation through compute power, money, or
+another scarce resource. EPDN explores this question:
 
-> “Önceden kaydedilmiş bir gömülü cihaz kimliğine her turda yalnızca bir
-> katılım hakkı verirsek, işlem gücü yarışına gerek kalmadan belirlenebilir ve
-> doğrulanabilir bir test ağı kurabilir miyiz?”
+> “If we give each pre-registered embedded-device identity only one opportunity
+> to participate per round, can we build a deterministic and verifiable test
+> network without a race for compute power?”
 
-Bu yaklaşım üç şeyi birbirinden ayırır:
+This approach separates three concerns:
 
-- **Cihazın katılım kimliği:** Cihazın bilet imzalamasına yarar.
-- **Cüzdan sahipliği:** Ödülü almak ve transfer imzalamak için kullanılır.
-- **Ağ doğrulaması:** Validator bütün sertifika, imza, tekrar ve durum
-  kurallarını uygular.
+- **Device participation identity:** Used by the device to sign tickets.
+- **Wallet ownership:** Used to receive rewards and sign transfers.
+- **Network validation:** The validator enforces every certificate, signature,
+  replay, and state rule.
 
 ```mermaid
 flowchart TB
-    Q["Araştırma sorusu"] --> I["Kayıtlı kimlik başına<br/>bir turda bir hak"]
-    I --> N["Nonce araması yok"]
-    N --> P["İşlem gücü avantajı azalır"]
-    P --> R["Deterministik ve tekrar üretilebilir seçim"]
+    Q["Research question"] --> I["One opportunity per round<br/>for each registered identity"]
+    I --> N["No nonce search"]
+    N --> P["Reduced compute-power advantage"]
+    P --> R["Deterministic and reproducible selection"]
 ```
 
-<a id="nedir-ne-degildir"></a>
-## EPDN nedir, ne değildir?
+<a id="what-it-is-and-is-not"></a>
+## What EPDN is—and is not
 
-| EPDN... | Açıklama |
+| EPDN is... | Explanation |
 |---|---|
-| **Deneysel bir test ağıdır** | Protokol, cihaz, validator ve arayüz birlikte denenebilir. |
-| **Proof-of-device fikrini araştırır** | Katılım hakkı kayıtlı kriptografik kimliğe bağlanır. |
-| **Deterministiktir** | Aynı geçerli girdiler aynı bilet sırasını ve sonucu üretir. |
-| **Çok bileşenli bir örnektir** | Rust, Arduino/C++, Python ve TypeScript parçaları birlikte çalışır. |
-| **Güvenliği açıkça sınırlar** | Desteklenmeyen üretim ayarları sessizce zayıf moda düşmez. |
+| **An experimental test network** | The protocol, devices, validator, and interface can be tried together. |
+| **An exploration of proof of device** | Participation rights are tied to registered cryptographic identities. |
+| **Deterministic** | The same valid inputs produce the same ticket order and result. |
+| **A multi-component example** | Rust, Arduino/C++, Python, and TypeScript components work together. |
+| **Explicit about its security boundaries** | Unsupported production settings do not silently fall back to a weak mode. |
 
-| EPDN... değildir | Neden? |
+| EPDN is not... | Why? |
 |---|---|
-| **Ana ağ veya gerçek kripto para değildir** | Birimler yalnız test amacı taşır ve gerçek değer sözü yoktur. |
-| **Proof of Work değildir** | Nonce arama ve hash gücü yarışı bulunmaz. |
-| **Fiziksel cihaz benzersizliği garantisi değildir** | Mevcut ESP32 geliştirme anahtarı yazılım depolamasındadır. |
-| **Tam merkeziyetsiz ağ değildir** | Çalışan MVP tek validator modeline sahiptir. |
-| **Üretime hazır değildir** | Bağımsız denetim, P2P finality ve doğrulanmış donanım anahtarları eksiktir. |
-| **Her gömülü kartı bugün desteklemez** | Protokol taşınabilir tasarlanmıştır; çalışan cihaz katmanı şu an ESP32 merkezlidir. |
+| **A mainnet or a real cryptocurrency** | Its units exist only for testing and carry no promise of real-world value. |
+| **Proof of Work** | There is no nonce search or race for hash power. |
+| **A guarantee of physical-device uniqueness** | The current ESP32 development key is stored in software. |
+| **A fully decentralized network** | The working MVP uses a single-validator model. |
+| **Production ready** | Independent auditing, P2P finality, and verified hardware keys are still missing. |
+| **Compatible with every embedded board today** | The protocol is designed to be portable, but the working device layer is currently centered on ESP32. |
 
-<a id="mevcut-durum"></a>
-## Mevcut durum
+<a id="current-status"></a>
+## Current status
 
-| Alan | Bugünkü durum |
+| Area | Current status |
 |---|---|
-| Protokol ve kurallar | Rust ile uygulanmış ve test ediliyor |
-| Validator node | Yerel geliştirme için çalışan REST/SSE servisi |
-| Cihaz yazılımı | Arduino ekosisteminde ESP32 merkezli |
-| Fiziksel test | Klasik ESP32 ailesinde UART gateway akışı doğrulandı |
-| Ek ESP32 hedefleri | ESP32-S2, ESP32-S3 ve ESP32-C3 için `WiFiMiner` CI'da derleniyor |
-| Diğer gömülü aileler | Mimari hedef/yol haritası; hazır ve doğrulanmış istemci yok |
-| Dashboard ve cüzdan | Yerel çalışabilen, kurulabilir PWA |
-| Indexer | Yeniden oluşturulabilir SQLite görünümü ve JSON dışa aktarma |
-| Üç validator deneyi | Üç ayrı yerel API süreci ve deterministik karşılaştırma testi |
-| Üretim modu | Tasarım hedefi; henüz kullanılabilir üretim ağı değil |
+| Protocol and rules | Implemented in Rust and covered by tests |
+| Validator node | Working REST/SSE service for local development |
+| Device firmware | Centered on ESP32 within the Arduino ecosystem |
+| Physical testing | UART gateway flow verified on one classic ESP32-family target |
+| Additional ESP32 targets | `WiFiMiner` is compiled in CI for ESP32-S2, ESP32-S3, and ESP32-C3 |
+| Other embedded families | Architecture target/roadmap only; no ready, verified client |
+| Dashboard and wallet | Installable PWA that can run locally |
+| Indexer | Rebuildable SQLite view with JSON export |
+| Three-validator experiment | Three separate local API processes with a deterministic comparison test |
+| Production mode | A design target; not yet a usable production network |
 
-Projenin uzun vadeli hedefi yalnız ESP32 değildir. Ancak README boyunca
-**uygulandı**, **yalnızca derlendi**, **fiziksel olarak test edildi** ve
-**planlandı** ifadeleri özellikle ayrı tutulur.
+The project's long-term target is not limited to ESP32. Throughout this README,
+however, **implemented**, **compiled only**, **physically tested**, and
+**planned** are kept deliberately distinct.
 
 ```mermaid
 flowchart LR
-    A["Platformdan bağımsız<br/>EPDN protokolü"] --> B["Arduino cihaz katmanı"]
-    B --> C["Bugün:<br/>ESP32 ailesi"]
-    B -.->|"yeni adaptör gerekir"| D["Hedef:<br/>RP2040 / Pico W"]
-    B -.->|"yeni adaptör gerekir"| E["Hedef:<br/>STM32 / SAMD / Renesas"]
-    B -.->|"yeni adaptör gerekir"| F["Hedef:<br/>ESP8266 ve diğerleri"]
+    A["Platform-independent<br/>EPDN protocol"] --> B["Arduino device layer"]
+    B --> C["Today:<br/>ESP32 family"]
+    B -.->|"new adapter required"| D["Target:<br/>RP2040 / Pico W"]
+    B -.->|"new adapter required"| E["Target:<br/>STM32 / SAMD / Renesas"]
+    B -.->|"new adapter required"| F["Target:<br/>ESP8266 and others"]
 ```
 
-<a id="sozluk"></a>
-## Temel kavramlar sözlüğü
+<a id="glossary"></a>
+## Glossary
 
-| Kavram | Basit açıklama |
+| Term | Plain-language meaning |
 |---|---|
-| **Node / Validator** | Ağ kurallarını uygulayan ve geçerli blok oluşturan Rust servisi. |
-| **Miner / Cihaz** | Her turda kendi kayıtlı kimliğiyle en fazla bir bilet hazırlayan gömülü cihaz. |
-| **Provisioning** | Cihaza geliştirme kimliği/sertifikası verme ve onu validator'a kaydetme işlemi. |
-| **Cihaz sertifikası** | Bir cihaz anahtarının bu test ağına kabul edildiğini gösteren imzalı kayıt. |
-| **Epoch** | Varsayılan olarak 30 saniye süren bir ağ turu. |
-| **Ticket / Bilet** | Cihazın o tura katılımını temsil eden deterministik veri. |
-| **PoPED** | `Proof of Provisioned Embedded Device`; kayıtlı kimlik başına tek bilet kuralı. |
-| **Gateway** | UART ile gelen, zaten imzalanmış veriyi node'a taşıyan güvensiz kabul edilen köprü. |
-| **Indexer** | Kesinleşmiş bloklardan sorgulanabilir bir SQLite görünümü üretir. |
-| **Wallet / Cüzdan** | Test birimlerini alıp göndermek için ayrı anahtar kullanan yerel tarayıcı cüzdanı. |
-| **PWA** | Tarayıcıdan açılıp desteklenen sistemlerde uygulama gibi kurulabilen web arayüzü. |
-| **Hash** | Bir verinin sabit uzunlukta dijital parmak izi. Veri değişirse hash de değişir. |
-| **Kanonik** | Aynı bilginin herkes tarafından yalnızca tek bir geçerli bayt düzeninde yazılması. |
-| **REST / SSE** | REST istek-cevap API'sidir; SSE node olaylarını dashboard'a anlık iletir. |
-| **CI** | Her kod değişikliğinde derleme, test ve güvenlik kontrollerini otomatik çalıştıran sistem. |
-| **P2P / Finality** | Node'ların doğrudan haberleşmesi ve bir bloğun artık değişmeyeceği konusunda anlaşması. |
-| **Secure element** | Özel anahtarı dışarı vermeden cihaz içinde imza üreten ayrı güvenlik çipi. |
-| **L0–L4** | Cihaz anahtarının ne kadar güçlü korunduğunu anlatan güvenlik sınıfları. |
+| **Node / Validator** | The Rust service that applies network rules and creates valid blocks. |
+| **Miner / Device** | An embedded device that prepares at most one ticket per round with its registered identity. |
+| **Provisioning** | Giving a device a development identity/certificate and registering it with the validator. |
+| **Device certificate** | A signed record showing that a device key is accepted by this test network. |
+| **Epoch** | A protocol round designed around a 30-second schedule; the current node advances it through an explicit finalize call. |
+| **Ticket** | Deterministic data representing the device's participation in a round. |
+| **PoPED** | `Proof of Provisioned Embedded Device`; the one-ticket-per-registered-identity rule. |
+| **Gateway** | An untrusted bridge that carries already-signed UART data to the node. |
+| **Indexer** | Builds a queryable SQLite view from finalized blocks. |
+| **Wallet** | A local browser wallet using a separate key to receive and send test units. |
+| **PWA** | A web interface that can be installed like an application on supported systems. |
+| **Hash** | A fixed-length digital fingerprint of data. If the data changes, the hash changes. |
+| **Canonical** | Representing the same information in exactly one valid byte layout. |
+| **REST / SSE** | REST is a request-response API; SSE streams node events to the dashboard. |
+| **CI** | Automatically runs builds, tests, and security checks for every code change. |
+| **P2P / Finality** | Nodes communicating directly and agreeing that a block can no longer change. |
+| **Secure element** | A separate security chip that signs inside the device without exporting the private key. |
+| **L0–L4** | Security classes describing how strongly the device key is protected. |
 
-<a id="mimari"></a>
-## Sistem mimarisi
+<a id="architecture"></a>
+## System architecture
 
 ```mermaid
 flowchart LR
-    subgraph DEVICE["Gömülü cihaz"]
+    subgraph DEVICE["Embedded device"]
         MINER["EPDN Miner"]
-        DKEY["Cihaz kimlik anahtarı"]
+        DKEY["Device identity key"]
         MINER --- DKEY
     end
 
-    subgraph HOST["Yerel / operatör bilgisayarı"]
+    subgraph HOST["Local / operator computer"]
         PROV["Provisioning CLI"]
-        GATE["UART Gateway<br/>(güvensiz röle)"]
+        GATE["UART Gateway<br/>(untrusted relay)"]
     end
 
-    subgraph NETWORK["EPDN test ağı"]
+    subgraph NETWORK["EPDN test network"]
         NODE["Rust Validator Node"]
-        STATE[("İmzalı durum<br/>kaydı")]
+        STATE[("Signed state<br/>record")]
         NODE --- STATE
     end
 
-    subgraph READ["Okuma ve kullanıcı katmanı"]
+    subgraph READ["Read and user layer"]
         INDEX[("SQLite Indexer")]
         DASH["Dashboard / Explorer"]
-        WALLET["Şifreli yerel cüzdan"]
-        ANALYTICS["Harici analiz aracı"]
+        WALLET["Encrypted local wallet"]
+        ANALYTICS["External analytics tool"]
     end
 
-    MINER -->|"yalnız açık kimliği verir"| PROV
-    PROV -->|"sertifikayı kurar"| MINER
-    PROV -->|"sertifika ve ödül adresini kaydeder"| NODE
-    MINER -->|"Wi-Fi ile imzalı bilet"| NODE
-    MINER -->|"UART ile imzalı bilet"| GATE
-    GATE -->|"aynı baytları iletir"| NODE
+    MINER -->|"provides only public identity"| PROV
+    PROV -->|"installs certificate"| MINER
+    PROV -->|"registers certificate and reward address"| NODE
+    MINER -->|"signed ticket over Wi-Fi"| NODE
+    MINER -->|"signed ticket over UART"| GATE
+    GATE -->|"forwards identical bytes"| NODE
     INDEX -->|"GET /api/v1/blocks"| NODE
-    NODE -->|"blok listesi yanıtı"| INDEX
+    NODE -->|"block-list response"| INDEX
     NODE -->|"REST + SSE"| DASH
-    INDEX -->|"isteğe bağlı JSON export"| ANALYTICS
-    WALLET -->|"imzalı transfer"| NODE
+    INDEX -->|"optional JSON export"| ANALYTICS
+    WALLET -->|"signed transfer"| NODE
 ```
 
-Okların anlamı önemlidir:
+The arrows matter:
 
-- Gateway cihaz adına imza üretmez; yalnızca bayt taşır.
-- Miner cüzdanın özel anahtarını bilmez; yalnızca ödülün gideceği açık adresi
-  bilir.
-- Indexer doğruluğun ana kaynağı değildir; validator verisinden silinip yeniden
-  oluşturulabilir.
-- JSON yalnız API sınırında kullanılır. İmzalanan ve hash'lenen değerler sabit
-  sıralı `EPDN Binary Encoding v1` biçimindedir.
+- The gateway does not sign on behalf of the device; it only carries bytes.
+- The miner does not know the wallet private key; it knows only the public
+  address that receives rewards.
+- The indexer is not the source of truth; it can be deleted and rebuilt from
+  validator data.
+- JSON is used only at API boundaries. Signed and hashed values use the
+  fixed-order `EPDN Binary Encoding v1` format.
 
-<a id="bilesenler"></a>
-## Bileşenler ve görevleri
+<a id="components"></a>
+## Components and responsibilities
 
-| Bileşen | Dil | Ne yapar? | Ne yapmaz? |
+| Component | Language | What does it do? | What does it not do? |
 |---|---|---|---|
-| [`protocol/`](protocol/) | Rust | Kodlama, sertifika, bilet, blok, işlem ve seçim kuralları | HTTP arayüzü veya cihaz sürücüsü içermez |
-| [`node/`](node/) | Rust | Validator, kayıt defteri, epoch, ödül, transfer, iptal, REST/SSE ve kalıcı durum | Üretim sınıfı P2P konsensüs sağlamaz |
-| [`arduino/`](arduino/) | C++ / Arduino | Cihaz kimliği, bilet motoru, Wi-Fi/UART miner örnekleri | Bugün bütün kart ailelerini desteklemez |
-| [`provisioning/`](provisioning/) | Python | İnceleme, geliştirme kaydı, yükleme, izleme ve iptal araçları | MVP'de geri döndürülemez eFuse değişikliği yapmaz |
-| [`gateway/`](gateway/) | Python | UART cihazıyla node arasında sınırlı veri rölesi | Özel anahtar tutmaz ve cihaz yerine imza atmaz |
-| [`indexer/`](indexer/) | Python / SQLite | Kesinleşmiş blokları doğrulayıp sorgulanabilir görünüm üretir | Validator'ın yerine geçmez |
-| [`dashboard/`](dashboard/) | TypeScript / React | Explorer, cihaz paneli, PWA ve şifreli yerel cüzdan | Validator yokken sahte canlı ağ izlenimi vermez; demo etiketi gösterir |
-| [`scripts/testnet.py`](scripts/testnet.py) | Python | Üç yerel node sürecini başlatır ve smoke testi çalıştırır | Bu süreçleri P2P eşlerine dönüştürmez |
+| [`protocol/`](protocol/) | Rust | Encoding, certificate, ticket, block, transaction, and selection rules | Does not contain an HTTP interface or device driver |
+| [`node/`](node/) | Rust | Validator, registry, epochs, rewards, transfers, revocations, REST/SSE, and persistent state | Does not provide production-grade P2P consensus |
+| [`arduino/`](arduino/) | C++ / Arduino | Device identity, ticket engine, and Wi-Fi/UART miner examples | Does not support every board family today |
+| [`provisioning/`](provisioning/) | Python | Inspection, development enrollment, flashing, monitoring, and revocation tools | Does not make irreversible eFuse changes in this MVP |
+| [`gateway/`](gateway/) | Python | Bounded data relay between a UART device and the node | Does not hold a private key or sign for the device |
+| [`indexer/`](indexer/) | Python / SQLite | Validates finalized blocks and builds a queryable view | Does not replace the validator |
+| [`dashboard/`](dashboard/) | TypeScript / React | Explorer, device panel, PWA, and encrypted local wallet | Does not pretend demo data is live when no validator is available |
+| [`scripts/testnet.py`](scripts/testnet.py) | Python | Starts three local node processes and runs a smoke test | Does not turn those processes into P2P peers |
 
-<a id="calisma-akisi"></a>
-## Uçtan uca çalışma akışı
+<a id="end-to-end-flow"></a>
+## End-to-end flow
 
 ```mermaid
 sequenceDiagram
-    actor Operator as Operatör
+    actor Operator as Operator
     participant Provisioner as Provisioning CLI
-    participant Device as Gömülü cihaz
+    participant Device as Embedded device
     participant Node as Validator
     participant Indexer as Indexer
     participant UI as Dashboard
 
-    Operator->>Provisioner: Geliştirme kaydını başlatır
-    Provisioner->>Device: Açık cihaz kimliğini ister
-    Device->>Device: Özel anahtarı cihazda üretir veya yükler
-    Device-->>Provisioner: Yalnız açık anahtarı verir
-    Provisioner->>Node: Açık kimlik için geliştirme sertifikası ister
-    Node-->>Provisioner: İmzalı cihaz sertifikasını verir
-    Provisioner->>Device: Yalnız sertifikayı kurar
-    Provisioner->>Node: Sertifikayı ve ödül adresini kaydeder
-    Node-->>Device: Cihaza bağlı epoch challenge verir
-    Device->>Device: Tek bileti hesaplar ve imzalar
-    Device->>Node: İmzalı bilet gönderir
-    Node->>Node: Sertifika, imza, epoch ve tekrar kontrolleri
-    Node->>Node: En düşük geçerli puanı seçer
-    Indexer->>Node: GET /api/v1/blocks ile blok listesini ister
-    Node-->>Indexer: Kesinleşmiş blok listesini döndürür
-    Node-->>UI: REST verisi ve SSE olayları gönderir
-    UI-->>Operator: Blok, cihaz ve test ödülünü gösterir
+    Operator->>Provisioner: Starts development enrollment
+    Provisioner->>Device: Requests the public device identity
+    Device->>Device: Generates or loads the private key on the device
+    Device-->>Provisioner: Returns only the public key
+    Provisioner->>Node: Requests a development certificate for the public identity
+    Node-->>Provisioner: Returns the signed device certificate
+    Provisioner->>Device: Installs only the certificate
+    Provisioner->>Node: Registers the certificate and reward address
+    Node-->>Device: Returns a device-bound epoch challenge
+    Device->>Device: Computes and signs its single ticket
+    Device->>Node: Submits the signed ticket
+    Node->>Node: Checks the certificate, signature, epoch, and replay rules
+    Node->>Node: Selects the lowest valid score
+    Indexer->>Node: Requests the block list with GET /api/v1/blocks
+    Node-->>Indexer: Returns the finalized block list
+    Node-->>UI: Sends REST data and SSE events
+    UI-->>Operator: Displays blocks, devices, and test rewards
 ```
 
-Bir biletin kabul edilmesi için yalnızca imzanın doğru olması yetmez. Validator
-aynı zamanda ağ kimliğini, epoch'u, önceki blok bağını, firmware politikasını,
-sertifika süresini, güvenlik sınıfını, iptal durumunu, paket boyutunu ve tekrar
-gönderimini de kontrol eder.
+A valid signature alone is not enough for a ticket to be accepted. The validator
+also checks the network identity, epoch, previous-block link, firmware policy,
+certificate lifetime, security class, revocation status, packet size, and replay
+status.
 
 <a id="poped"></a>
-## PoPED nasıl çalışır?
+## How does PoPED work?
 
-`Proof of Provisioned Embedded Device (PoPED)`, kayıtlı her kimliğe bir epoch
-için en fazla bir deterministik sonuç verir.
+`Proof of Provisioned Embedded Device (PoPED)` gives each registered identity at
+most one deterministic result per epoch.
 
-Basitleştirilmiş mantık:
+In simplified form:
 
 ```text
-bilet = SHA256("EPDN_TICKET_V1" || cihaz_açık_anahtar_hash || epoch_challenge)
-puan  = SHA256("EPDN_SCORE_V1"  || bilet)
+ticket = SHA256("EPDN_TICKET_V1" || device_public_key_hash || epoch_challenge)
+score  = SHA256("EPDN_SCORE_V1"  || ticket)
 ```
 
-İmza, cihazın kayıtlı özel anahtara sahip olduğunu kanıtlar. Fakat imza baytları
-bilet puanına katılmaz. Böylece aynı mesaj için farklı geçerli ECDSA imzaları
-üretmek daha iyi puan aramak için kullanılamaz.
+The signature proves that the device possesses the registered private key.
+However, the signature bytes are not included in the ticket score. A device
+therefore cannot search for a better score by producing different valid ECDSA
+signatures for the same message.
 
-| Özellik | Proof of Work | EPDN PoPED MVP |
+| Property | Proof of Work | EPDN PoPED MVP |
 |---|---|---|
-| Katılım kaynağı | Hesaplama gücü | Kayıtlı cihaz kimliği |
-| Tur başına deneme | Donanım hızına göre çok sayıda | Kimlik başına en fazla bir |
-| Nonce araması (çok sayıda değer deneyerek çözüm arama) | Var | Yok |
-| Daha hızlı GPU/ASIC avantajı | Genellikle var | Aynı kimlik için ek bilet sağlamaz |
-| Temel güven varsayımı | Ekonomik ve hesaplama maliyeti | Provisioning otoritesi ve cihaz anahtarı |
-| Fiziksel cihaz garantisi | Yok | MVP'de yok; donanım destekli anahtar gerektirir |
+| Source of participation | Computing power | Registered device identity |
+| Attempts per round | Many, depending on hardware speed | At most one per identity |
+| Nonce search (trying many values to find a solution) | Yes | No |
+| Advantage from a faster GPU/ASIC | Usually yes | Does not provide extra tickets for the same identity |
+| Primary trust assumption | Economic and computational cost | Provisioning authority and device key |
+| Physical-device guarantee | No | Not in the MVP; requires a hardware-backed key |
 
 ```mermaid
 flowchart TD
-    A["Validator epoch challenge yayınlar"] --> B{"Kimlik kayıtlı ve<br/>sertifika geçerli mi?"}
-    B -->|"Hayır"| X["Bilet reddedilir"]
-    B -->|"Evet"| C["Cihaz tek deterministik bileti üretir"]
-    C --> D["Cihaz proof ve submission imzalar"]
-    D --> E{"İmza, firmware, epoch,<br/>iptal ve tekrar kontrolleri"}
-    E -->|"Başarısız"| X
-    E -->|"Başarılı"| F["Bilet havuzuna eklenir"]
-    F --> G["En düşük puan seçilir"]
-    G --> H["İmzalı blok kesinleşir"]
+    A["Validator publishes an epoch challenge"] --> B{"Is the identity registered and<br/>the certificate valid?"}
+    B -->|"No"| X["Ticket is rejected"]
+    B -->|"Yes"| C["Device creates its single deterministic ticket"]
+    C --> D["Device signs the proof and submission"]
+    D --> E{"Signature, firmware, epoch,<br/>revocation, and replay checks"}
+    E -->|"Failed"| X
+    E -->|"Passed"| F["Ticket enters the pool"]
+    F --> G["The lowest score is selected"]
+    G --> H["The signed block is finalized"]
 ```
 
-Ayrıntılı biçim ve güvenlik gerekçesi:
-[`PROTOCOL.md`](PROTOCOL.md) ve
+For the complete format and security rationale, see
+[`PROTOCOL.md`](PROTOCOL.md) and
 [`docs/consensus.md`](docs/consensus.md).
 
 <a id="epoch"></a>
-## Bir epoch içinde ne olur?
+## What happens during an epoch?
 
-Varsayılan epoch süresi **30 saniyedir**:
+The protocol design uses a **30-second epoch schedule**:
 
-- İlk 20 saniye: bilet gönderim penceresi.
-- Son 10 saniye: sonlandırma penceresi.
-- Geçerli biletler arasından deterministik kazanan seçilir.
-- Transferler ve iptaller ancak bir bloğa girdiklerinde kesinleşir.
+- First 20 seconds: ticket-submission window.
+- Last 10 seconds: finalization window.
+- A deterministic winner is selected from the valid tickets.
+- Transfers and revocations become final only after they are included in a block.
+
+The current single-node MVP does **not** run an autonomous wall-clock scheduler.
+An operator or test harness advances the epoch explicitly with
+`POST /api/v1/admin/epochs/finalize`. The 20/10-second split below documents the
+intended protocol schedule, not an automatic timer enforced by the current
+server. If there are neither accepted tickets nor pending revocations, the
+finalize request returns an error and the current epoch does not advance.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> BiletPenceresi
-    BiletPenceresi: 0–20 saniye
-    BiletPenceresi: Geçerli biletler kabul edilir
-    BiletPenceresi --> SonlandirmaPenceresi: 20. saniye
-    SonlandirmaPenceresi: 20–30 saniye
-    SonlandirmaPenceresi: Yeni bilet reddedilir
-    SonlandirmaPenceresi --> Dogrulama: Epoch kapanır
-    Dogrulama --> NormalBlok: Geçerli kazanan varsa
-    Dogrulama --> YonetimBlogu: Yalnız kesinleşecek iptaller varsa
-    Dogrulama --> Sonucsuz: İşlenecek veri yoksa
-    NormalBlok --> [*]
-    YonetimBlogu --> [*]
-    Sonucsuz --> [*]
+    [*] --> TicketWindow
+    TicketWindow: 0–20 seconds
+    TicketWindow: Valid tickets are accepted
+    TicketWindow --> FinalizationWindow: At 20 seconds
+    FinalizationWindow: 20–30 seconds
+    FinalizationWindow: New tickets are rejected
+    FinalizationWindow --> Validation: Epoch closes
+    Validation --> NormalBlock: A valid winner exists
+    Validation --> ManagementBlock: Only revocations need finalization
+    Validation --> NoChange: No tickets or pending revocations
+    NormalBlock --> [*]
+    ManagementBlock --> [*]
+    NoChange --> TicketWindow: Finalize is rejected; same epoch remains
 ```
 
-Paketlerin node'a ulaşma sırası kazananı belirlemek için kullanılmaz. Eşitlik
-halinde cihaz açık anahtar hash'i ve submission hash'i gibi kanonik değerler
-kullanılır.
+The order in which packets reach the node is not used to choose the winner.
+Canonical values such as the device public-key hash and submission hash break
+ties.
 
-<a id="anahtar-ayrimi"></a>
-## Cihaz kimliği ile cüzdan neden ayrıdır?
+<a id="key-separation"></a>
+## Why are the device identity and wallet separate?
 
-EPDN iki farklı özel anahtar kullanır:
+EPDN uses two different private keys:
 
 ```mermaid
 flowchart LR
-    subgraph DEVICE["Cihaz güven sınırı"]
-        DK["Cihaz özel anahtarı"]
-        SIGN["Bilet imzalama"]
+    subgraph DEVICE["Device trust boundary"]
+        DK["Device private key"]
+        SIGN["Ticket signing"]
         DK --> SIGN
     end
 
-    subgraph BROWSER["Tarayıcı güven sınırı"]
-        WK["Şifrelenmiş cüzdan özel anahtarı"]
-        TX["Transfer imzalama"]
+    subgraph BROWSER["Browser trust boundary"]
+        WK["Encrypted wallet private key"]
+        TX["Transfer signing"]
         WK --> TX
     end
 
-    SIGN -->|"imzalı bilet"| NODE["Validator"]
-    TX -->|"imzalı transfer"| NODE
-    WALLETADDR["Yalnız açık ödül adresi"] --> DEVICE
+    SIGN -->|"signed ticket"| NODE["Validator"]
+    TX -->|"signed transfer"| NODE
+    WALLETADDR["Public reward address only"] --> DEVICE
 
-    DK -.->|"gönderilmez"| BROWSER
-    WK -.->|"gönderilmez"| DEVICE
-    DK -.->|"gönderilmez"| NODE
-    WK -.->|"gönderilmez"| NODE
+    DK -.->|"never sent"| BROWSER
+    WK -.->|"never sent"| DEVICE
+    DK -.->|"never sent"| NODE
+    WK -.->|"never sent"| NODE
 ```
 
-- **Cihaz anahtarı**, miner'ın kayıtlı katılımcı olduğunu kanıtlar.
-- **Cüzdan anahtarı**, test birimlerini harcama yetkisi verir.
-- Miner yalnızca açık ödül adresini bilir.
-- Cüzdan özel anahtarının firmware'e yazılması tasarım ihlalidir.
-- Cihaz özel anahtarının dashboard'a gönderilmesi de tasarım ihlalidir.
+- The **device key** proves that the miner is a registered participant.
+- The **wallet key** authorizes spending test units.
+- The miner knows only the public reward address.
+- Writing the wallet private key into firmware violates the design.
+- Sending the device private key to the dashboard also violates the design.
 
-<a id="donanim-destegi"></a>
-## Donanım desteği
+<a id="hardware-support"></a>
+## Hardware support
 
-### Etiketler ne anlama geliyor?
+### What do the labels mean?
 
-| Etiket | Anlamı |
+| Label | Meaning |
 |---|---|
-| **Fiziksel test** | Kod gerçek bir kartta çalıştırılmış ve davranış gözlenmiştir. |
-| **CI derleme** | Kod hedef için derlenmiştir; gerçek kartta çalıştığı iddia edilmez. |
-| **Planlı** | Mimari hedef vardır; tamamlanmış ve doğrulanmış destek yoktur. |
+| **Physical test** | The code was run on a real board and its behavior was observed. |
+| **CI build** | The code compiled for the target; this does not claim that it ran on a real board. |
+| **Planned** | The architecture has a target, but support is not complete or verified. |
 
-### Güncel destek tablosu
+### Current support matrix
 
-| Donanım / aile | Durum | Kapsam |
+| Hardware / family | Status | Coverage |
 |---|---|---|
-| Klasik ESP32 ailesi | **Fiziksel test + CI derleme** | UART gateway, protokol vektörü, kayıt, bilet, ödül ve iptal akışı |
-| ESP32-S2 | **CI derleme** | Yalnız `WiFiMiner`; fiziksel test yok |
-| ESP32-S3 | **CI derleme** | Yalnız `WiFiMiner`; fiziksel test yok |
-| ESP32-C3 | **CI derleme** | Yalnız `WiFiMiner`; fiziksel test yok |
-| ESP32-C2/C5/C6/C61/H2/P4 | **Planlı** | Modele uygun ağ ve kimlik adaptörü gerekir |
-| ESP8266 | **Planlı** | Hazır/doğrulanmış miner yok |
-| RP2040 / Raspberry Pi Pico W | **Planlı** | Hazır/doğrulanmış miner yok |
-| SAMD / Nano / MKR ailesi | **Planlı** | Kart ve secure-element yetenekleri ayrıca doğrulanmalı |
-| STM32 Arduino çekirdekleri | **Planlı** | MCU ve kart bazında adaptör gerekir |
-| Renesas Arduino çekirdekleri | **Planlı** | Hedef bazında adaptör gerekir |
-| ATECC608A / ECC508 | **Planlı** | Mevcut örnek fail-closed placeholder; gerçek entegrasyon değil |
+| One classic ESP32-family target | **Physical test + CI build** | UART gateway, protocol vectors, enrollment, tickets, rewards, and revocation flow |
+| ESP32-S2 | **CI build** | `WiFiMiner` only; no physical test |
+| ESP32-S3 | **CI build** | `WiFiMiner` only; no physical test |
+| ESP32-C3 | **CI build** | `WiFiMiner` only; no physical test |
+| ESP32-C2/C5/C6/C61/H2/P4 | **Planned** | Requires network and identity adapters appropriate for each model |
+| ESP8266 | **Planned** | No ready or verified miner |
+| RP2040 / Raspberry Pi Pico W | **Planned** | No ready or verified miner |
+| SAMD / Nano / MKR family | **Planned** | Board and secure-element capabilities must be verified separately |
+| STM32 Arduino cores | **Planned** | Requires MCU- and board-specific adapters |
+| Renesas Arduino cores | **Planned** | Requires target-specific adapters |
+| ATECC608A / ECC508 | **Planned** | The current example is a fail-closed placeholder, not a real integration |
 
 > [!NOTE]
-> ESP32-S2/S3/C3 için derleme başarısı, Wi-Fi uçtan uca testi veya fiziksel
-> donanım doğrulaması anlamına gelmez. Klasik ESP32 üzerindeki fiziksel test de
-> kartın özel anahtarını donanım seviyesinde klonlanamaz yapmaz.
+> A successful build for ESP32-S2/S3/C3 does not mean that Wi-Fi was tested
+> end to end or that the target was verified on physical hardware. The physical
+> test on that classic ESP32-family target also does not make the board's private key
+> unclonable at the hardware level.
 
-Fiziksel kanıtlar:
-[`arduino/HARDWARE_TEST_REPORT.md`](arduino/HARDWARE_TEST_REPORT.md) ve
+Physical evidence:
+[`arduino/HARDWARE_TEST_REPORT.md`](arduino/HARDWARE_TEST_REPORT.md) and
 [`arduino/board-configs/support-matrix.json`](arduino/board-configs/support-matrix.json).
 
-<a id="guvenlik-siniflari"></a>
-## Güvenlik sınıfları
+<a id="security-classes"></a>
+## Security classes
 
-EPDN, kimlik saklama gücünü L0'dan L4'e kadar sınıflandırır:
+EPDN classifies identity-storage strength from L0 through L4:
 
 ```mermaid
 flowchart LR
-    L0["L0<br/>Yazılım test anahtarı"] --> L1["L1<br/>Korumalı yazılım"]
-    L1 --> L2["L2<br/>Yerel donanım kimliği"]
-    L2 --> L3["L3<br/>Harici secure element"]
-    L3 --> L4["L4<br/>Attestation destekli platform"]
+    L0["L0<br/>Software test key"] --> L1["L1<br/>Protected software"]
+    L1 --> L2["L2<br/>Local hardware identity"]
+    L2 --> L3["L3<br/>External secure element"]
+    L3 --> L4["L4<br/>Attestation-capable platform"]
 ```
 
-| Sınıf | Basit anlamı | Bu depodaki durum |
+| Class | Plain-language meaning | Status in this repository |
 |---|---|---|
-| **L0** | Dışarı aktarılabilir geliştirme/test anahtarı | Mevcut ESP32 geliştirme yolu |
-| **L1** | Yazılımın erişebildiği fakat daha korumalı saklama | Hedefe özel kanıt gerekir |
-| **L2** | İmzalama işlemi yerel donanıma bağlı | Henüz doğrulanmış genel backend yok |
-| **L3** | Anahtar secure element dışına çıkmaz | ATECC entegrasyonu planlı |
-| **L4** | Platform ölçümlerini imzalı attestation ile sunar | Tasarım hedefi |
+| **L0** | Exportable development/test key | Current ESP32 development path |
+| **L1** | Software-accessible key in more protected storage | Requires target-specific evidence |
+| **L2** | Signing operation bound to local hardware | No verified general-purpose backend yet |
+| **L3** | Key never leaves a secure element | ATECC integration is planned |
+| **L4** | Platform presents signed measurements through attestation | Design target |
 
-Üretim politikası L0 kimliği reddeder. Bir kartın adında “secure” veya “ESP32”
-geçmesi tek başına ona L2/L4 sınıfı vermez. Ayrıntılar:
+Production policy rejects L0 identities. A board does not qualify for L2 or L4
+merely because its name contains “secure” or “ESP32.” For details, see
 [`docs/security-classes.md`](docs/security-classes.md).
 
-<a id="guven-modeli"></a>
-## Güven ve tehdit modeli
+<a id="trust-model"></a>
+## Trust and threat model
 
 ```mermaid
 flowchart TB
-    PA["Provisioning otoritesi<br/>GÜVENİLİR"] -->|"sertifika imzalar"| CERT["Cihaz sertifikası"]
-    DEVICE["Cihaz anahtarı<br/>SEÇİLEN BACKEND KADAR GÜVENLİ"] -->|"bilet imzalar"| TICKET["İmzalı bilet"]
-    GATE["UART Gateway<br/>GÜVENİLMEZ"] -->|"düşürebilir / geciktirebilir / tekrar oynatabilir"| NODE["Validator"]
+    PA["Provisioning authority<br/>TRUSTED"] -->|"signs certificate"| CERT["Device certificate"]
+    DEVICE["Device key<br/>AS SECURE AS THE SELECTED BACKEND"] -->|"signs ticket"| TICKET["Signed ticket"]
+    GATE["UART Gateway<br/>UNTRUSTED"] -->|"may drop / delay / replay"| NODE["Validator"]
     CERT --> NODE
     TICKET --> GATE
-    NODE -->|"bütün kuralları yeniden doğrular"| BLOCK["İmzalı blok"]
-    BLOCK -->|"buradan yeniden oluşturulur"| INDEX["Indexer<br/>YENİDEN OLUŞTURULABİLİR"]
+    NODE -->|"revalidates every rule"| BLOCK["Signed block"]
+    BLOCK -->|"rebuilt from this"| INDEX["Indexer<br/>REBUILDABLE"]
 ```
 
-Sistem şu kabullere dayanır:
+The system relies on these assumptions:
 
-- Provisioning otoritesi sahte kimlik üretmemelidir.
-- Validator'ın CA ve blok imzalama anahtarları korunmalıdır.
-- Cihaz anahtarının güven seviyesi seçilen backend kadar güçlüdür.
-- Gateway güvenilir sayılmaz; node gelen veriyi yeniden doğrular.
-- MAC adresi, IP adresi, RSSI, kart modeli, reset nedeni veya zamanlama cihaz
-  kimliğinin güven kökü değildir.
+- The provisioning authority must not create fraudulent identities.
+- The validator's CA and block-signing keys must be protected.
+- A device key is only as secure as its selected backend.
+- The gateway is not trusted; the node revalidates incoming data.
+- A MAC address, IP address, RSSI value, board model, reset reason, or timing
+  information is not a root of trust for device identity.
 
-Önemli korumalar:
+Important safeguards:
 
-- P-256 imzaları ve SHA-256 alan ayrımlı hash'ler.
-- Sabit sıralı, boyutları sınırlı kanonik binary kodlama.
-- Kimlik başına epoch'ta tek bilet ve tekrar/replay kontrolleri.
-- Sertifika, firmware, güvenlik sınıfı ve iptal politikaları.
-- İmzalı, checksum'lı ve atomik V3 node durum kaydı.
-- Loopback dışına açılan node için güçlü admin token'ı, kesin CORS listesi ve
-  birbirinden farklı CA/validator anahtarları zorunluluğu.
-- Desteklenmeyen üretim backend'lerinde sessiz zayıflatma yerine hata.
+- P-256 signatures and SHA-256 hashes with domain separation.
+- Fixed-order, size-limited canonical binary encoding.
+- One ticket per identity per epoch, plus duplicate and replay checks.
+- Certificate, firmware, security-class, and revocation policies.
+- Signed, checksummed, and atomically stored V3 node state.
+- A strong admin token, an exact CORS allowlist, and distinct CA and validator
+  keys are mandatory when the node listens beyond loopback.
+- Unsupported production backends fail instead of silently weakening security.
 
-Tam tehdit modeli: [`THREAT_MODEL.md`](THREAT_MODEL.md).
+For the complete threat model, see [`THREAT_MODEL.md`](THREAT_MODEL.md).
 
-<a id="gizlilik"></a>
-## Gizlilik ve veri sınırları
+<a id="privacy"></a>
+## Privacy and data boundaries
 
-EPDN anonimlik ürünü değildir. Bloklar, işlemler, ödül adresleri ve genel cihaz
-kimlikleri test ağının herkese açık verileri olabilir. Buradaki gizlilik hedefi,
-gereksiz kişisel ve cihaz-tanımlayıcı verilerin kaynak koda, loglara ve genel
-explorer'a sızmasını önlemektir.
+EPDN is not an anonymity product. Blocks, transactions, reward addresses, and
+public device identities may be public testnet data. The privacy goal is to keep
+unnecessary personal and device-identifying data from leaking into source code,
+logs, or the public explorer.
 
 ```mermaid
 flowchart LR
-    PRIVATE["Yerel ve gizli kalmalı<br/>özel anahtarlar<br/>Wi-Fi parolası<br/>admin token'ı<br/>ham seri loglar"]
-    PUBLIC["Ağda paylaşılabilir<br/>açık anahtar hash'i<br/>sertifika<br/>imzalı bilet<br/>blok ve işlem"]
-    UI["Dashboard / Indexer<br/>yalnız gerekli genel alanlar"]
+    PRIVATE["Must remain local and private<br/>private keys<br/>Wi-Fi password<br/>admin token<br/>raw serial logs"]
+    PUBLIC["May be shared on the network<br/>public-key hash<br/>certificate<br/>signed ticket<br/>block and transaction"]
+    UI["Dashboard / Indexer<br/>only required public fields"]
 
-    PRIVATE -.->|"gönderilmez"| PUBLIC
+    PRIVATE -.->|"never sent"| PUBLIC
     PUBLIC --> UI
 ```
 
-| Veri | Olması gereken yer |
+| Data | Where it should live |
 |---|---|
-| Cihaz özel anahtarı | Yalnız cihazın seçilen kimlik backend'i |
-| Cüzdan özel anahtarı | Şifreli IndexedDB kaydı ve kilit açıkken tarayıcı belleği |
-| Wi-Fi parolası | Etkileşimli yerel giriş ve cihazın yerel depolaması |
-| Admin token'ı | Yerel/runtime ortam değişkeni |
-| Ham seri port çıktısı | Git tarafından yok sayılan yerel test klasörü |
-| Açık cihaz kimliği ve sertifika | Test ağı kayıt defteri |
-| Bloklar ve imzalı işlemler | Genel test ağı verisi |
-| Kişisel cihaz etiketi | Yalnız yetkili dashboard uygulama verisi |
+| Device private key | Only in the device's selected identity backend |
+| Wallet private key | Encrypted IndexedDB record and browser memory while unlocked |
+| Wi-Fi password | Interactive local input and the device's local storage |
+| Admin token | Local/runtime environment variable |
+| Raw serial-port output | Local test directory ignored by Git |
+| Public device identity and certificate | Testnet registry |
+| Blocks and signed transactions | Public testnet data |
+| Personal device label | Authorized dashboard application data only |
 
-Şunları issue, commit, ekran görüntüsü veya genel log içine koymayın:
+Do not put the following in an issue, commit, screenshot, or public log:
 
-- Özel anahtarlar ve kurtarma verileri
-- Wi-Fi SSID/parolaları
-- Admin token'ları
-- Tam seri port dökümleri
-- MAC adresleri, USB kimlikleri ve benzersiz çip kimlikleri
-- eFuse/security posture dökümleri
-- Kişisel dosya yolları, kullanıcı adları veya e-posta adresleri
+- Private keys or recovery data
+- Wi-Fi SSIDs or passwords
+- Admin tokens
+- Complete serial-port dumps
+- MAC addresses, USB identities, or unique chip identities
+- eFuse or security-posture dumps
+- Personal file paths, user names, or email addresses
 
-<a id="hizli-baslangic"></a>
-## Hızlı başlangıç
+<a id="quick-start"></a>
+## Quick start
 
-Önce ne görmek istediğinizi seçin:
+First, choose what you want to see:
 
 ```mermaid
 flowchart TD
-    START["Neyi denemek istiyorsunuz?"]
-    START -->|"Sadece arayüz"| DEMO["Yol 1<br/>Dashboard demo"]
-    START -->|"Gerçek yerel API"| LOCAL["Yol 2<br/>Validator + dashboard"]
-    START -->|"Otomatik ağ kontrolü"| SMOKE["Yol 3<br/>Üç süreçli smoke testi"]
-    START -->|"Cihaz kodu"| HW["Yol 4<br/>ESP32 derleme"]
+    START["What do you want to try?"]
+    START -->|"Dashboard only"| DEMO["Path 1<br/>Dashboard demo"]
+    START -->|"Real local API"| LOCAL["Path 2<br/>Validator + dashboard"]
+    START -->|"Automated network check"| SMOKE["Path 3<br/>Three-process smoke test"]
+    START -->|"Device code"| HW["Path 4<br/>ESP32 build"]
 ```
 
-### Gereksinimler
+### Requirements
 
-Yalnız kullanacağınız yolun araçlarını kurmanız yeterlidir.
+You only need to install the tools required by the path you choose.
 
-| Araç | Sürüm | Nerede gerekli? |
+| Tool | Version | Where is it needed? |
 |---|---:|---|
-| Git | Güncel | Depoyu indirmek için |
-| Rust | 1.85 | Protokol ve node |
-| Python | 3.11+ | Provisioning, gateway, indexer ve testnet scripti |
+| Git | Current | Cloning the repository |
+| Rust | 1.85 | Protocol and node |
+| Python | 3.11+ | Provisioning, gateway, indexer, and testnet script |
 | Node.js | 22.13+ | Dashboard/PWA |
-| Arduino CLI | 1.5.0 | ESP32 kodunu derlemek |
-| ESP32 Arduino core | 2.0.11 | ESP32 hedefleri |
-| Docker | İsteğe bağlı | Node container'ı |
+| Arduino CLI | 1.5.0 | Building ESP32 code |
+| ESP32 Arduino core | 2.0.11 | ESP32 targets |
+| Docker | Optional | Node container |
 
-Depoyu indirin:
+Clone the repository:
 
 ```bash
-git clone https://github.com/UfkuAcik/EPDN-Network.git
-cd EPDN-Network
+git clone https://github.com/UfkuAcik/Embedded_Proof-of-Device_Network.git
+cd Embedded_Proof-of-Device_Network
 ```
 
-<a id="arayuz-demo"></a>
-### Yol 1: Yalnızca arayüzü görmek
+<a id="dashboard-demo"></a>
+### Path 1: View only the dashboard
 
-Bu yol için fiziksel cihaz, Rust veya Python gerekmez. Validator bulunamazsa
-dashboard açıkça **DEMO DATA** etiketi gösterir ve deterministik örnek veri
-kullanır.
+This path does not require physical hardware, Rust, or Python. If no validator is
+available, the dashboard clearly displays a **DEMO DATA** label and uses
+deterministic sample data.
 
 ```bash
 cd dashboard
@@ -577,41 +587,42 @@ npm ci
 npm run dev
 ```
 
-Tarayıcıda [http://localhost:3000](http://localhost:3000) adresini açın.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-Beklenen sonuç:
+Expected result:
 
-- Explorer ekranı açılır.
-- Örnek bloklar ve cihazlar görünür.
-- Üstte bunun canlı ağ değil demo verisi olduğu belirtilir.
-- Demo modunda transfer veya iptal işlemi gerçek ağa gönderilmez.
+- The explorer opens.
+- Sample blocks and devices are displayed.
+- A notice at the top makes it clear that this is demo data, not a live network.
+- Wallet transfers are not broadcast while the interface is in demo mode.
+- Administrative revocation uses the server-configured validator target rather
+  than the demo/live label. Configure that target and its admin token only for
+  a validator you intend to control.
 
-<a id="yerel-validator"></a>
-### Yol 2: Yerel validator ve dashboard
+<a id="local-validator"></a>
+### Path 2: Local validator and dashboard
 
-#### 1. Validator'ı başlatın
+#### 1. Start the validator
 
-Depo kökünde:
+From the repository root:
 
 ```bash
 cargo run -p epdn-node
 ```
 
-Node varsayılan olarak yalnızca `127.0.0.1:8745` üzerinde dinler. Sağlık
-kontrolü:
+By default, the node listens only on `127.0.0.1:8745`. Check its health:
 
 ```bash
 curl http://127.0.0.1:8745/healthz
 ```
 
-Loopback geliştirme modunda yerel ve kasıtlı olarak güvensiz varsayılan
-anahtarlar kullanılabilir. Node'u başka bilgisayarların erişimine açmadan önce
-[`node/README.md`](node/README.md) içindeki zorunlu güvenlik değişkenlerini
-okuyun.
+Loopback development mode may use local, intentionally insecure default keys.
+Before making the node accessible to other computers, read the mandatory
+security variables in [`node/README.md`](node/README.md).
 
-#### 2. Dashboard'u node'a bağlayın
+#### 2. Connect the dashboard to the node
 
-Yeni bir terminal açın.
+Open a new terminal.
 
 PowerShell:
 
@@ -630,39 +641,40 @@ npm ci
 EPDN_API_BASE_URL=http://127.0.0.1:8745 npm run dev
 ```
 
-Dashboard'daki API alanında da `http://127.0.0.1:8745` seçilebilir. Bağlantı
-başarılıysa veri kaynağı demo yerine canlı node olarak görünür.
+You can also select `http://127.0.0.1:8745` in the dashboard's API field. If the
+connection succeeds, the data source is shown as the live node instead of the
+demo.
 
-<a id="uc-surecli-test"></a>
-### Yol 3: Üç süreçli test
+<a id="three-process-test"></a>
+### Path 3: Three-process test
 
 ```bash
 python scripts/testnet.py smoke
 ```
 
-Bu komut:
+This command:
 
-1. Güncel `epdn-node` kodunu derler.
-2. `8745`, `8746` ve `8747` portlarında üç ayrı yerel süreç başlatır.
-3. Sağlık ve temel ağ bilgilerini kontrol eder.
-4. Üç validator'lı deterministik commit/reveal testini çalıştırır.
-5. Süreçleri kapatır ve geçici durumu temizler.
+1. Builds the current `epdn-node` code.
+2. Starts three separate local processes on ports `8745`, `8746`, and `8747`.
+3. Checks health and basic network information.
+4. Runs a deterministic commit/reveal test with three validators.
+5. Stops the processes and removes temporary state.
 
-Portlar doluysa:
+If those ports are in use:
 
 ```bash
 python scripts/testnet.py --ports 18745,18746,18747 smoke
 ```
 
 > [!CAUTION]
-> Bu üç süreç birbirine blok veya oy gönderen P2P eşler değildir. Test,
-> bağımsız API süreçlerini ve aynı protokol girdilerindeki deterministik sonucu
-> doğrular; Byzantine finality kanıtlamaz.
+> These three processes are not P2P peers that exchange blocks or votes. The test
+> verifies independent API processes and deterministic results for identical
+> protocol inputs; it does not prove Byzantine finality.
 
-<a id="esp32-derleme"></a>
-### Yol 4: ESP32 kodunu derlemek
+<a id="esp32-build"></a>
+### Path 4: Build the ESP32 code
 
-Önce sabitlenmiş ESP32 çekirdeğini kurun:
+First, install the pinned ESP32 core:
 
 ```bash
 arduino-cli config init
@@ -671,7 +683,7 @@ arduino-cli core update-index
 arduino-cli core install esp32:esp32@2.0.11
 ```
 
-Donanıma hiçbir şey yüklemeden tanı örneğini derleyin:
+Compile the diagnostic example without uploading anything to the hardware:
 
 ```bash
 arduino-cli compile \
@@ -680,100 +692,101 @@ arduino-cli compile \
   arduino/examples/SecurityDiagnostic
 ```
 
-PowerShell'de aynı komut tek satır olarak da çalıştırılabilir:
+In PowerShell, the same command can be run on one line:
 
 ```powershell
 arduino-cli compile --fqbn esp32:esp32:esp32 --libraries arduino/libraries arduino/examples/SecurityDiagnostic
 ```
 
-Diğer örnekler:
+Other examples:
 
-| Örnek | Amaç |
+| Example | Purpose |
 |---|---|
-| `SecurityDiagnostic` | Hedefin bildirdiği güvenlik yeteneklerini güvenli biçimde inceler |
-| `SerialProvisioning` | Wi-Fi ve geliştirme kayıt verisini seri bağlantıdan alır |
-| `WiFiMiner` | Node ile doğrudan Wi-Fi üzerinden konuşur |
-| `GatewayMiner` | İmzalı bileti UART gateway üzerinden yollar |
-| `ProtocolTestVectors` | Rust ve Arduino kodlamasının aynı baytları ürettiğini kontrol eder |
-| `SecureElementMiner` | Planlanan secure-element yolunun fail-closed placeholder'ıdır |
+| `SecurityDiagnostic` | Safely inspects the security capabilities reported by the target |
+| `SerialProvisioning` | Receives Wi-Fi and development enrollment data over a serial connection |
+| `WiFiMiner` | Communicates directly with the node over Wi-Fi |
+| `GatewayMiner` | Sends a signed ticket through the UART gateway |
+| `ProtocolTestVectors` | Confirms that Rust and Arduino encoding produce the same bytes |
+| `SecureElementMiner` | A fail-closed placeholder for the planned secure-element path |
 
 > [!CAUTION]
-> Derleme donanımı değiştirmez; **upload** işlemi karttaki mevcut uygulamayı
-> değiştirir. Doğru kart/FQBN ve portu kendiniz doğrulamadan yükleme yapmayın.
-> Bu proje eFuse, Secure Boot, Flash Encryption, JTAG veya anti-rollback
-> ayarlarını otomatik olarak değiştirmez.
+> Compilation does not change the hardware; an **upload** replaces the
+> application currently stored on the board. Do not upload until you have
+> verified the correct board/FQBN and port yourself. This project does not
+> automatically change eFuse, Secure Boot, Flash Encryption, JTAG, or
+> anti-rollback settings.
 
-Cihaz kurulumu için:
+For device setup, see
 [`arduino/README.md`](arduino/README.md),
-[`docs/hardware-testing.md`](docs/hardware-testing.md) ve
+[`docs/hardware-testing.md`](docs/hardware-testing.md), and
 [`docs/wifi-provisioning.md`](docs/wifi-provisioning.md).
 
-<a id="depo-yapisi"></a>
-## Depo yapısı
+<a id="repository-layout"></a>
+## Repository layout
 
 ```text
-EPDN-Network/
-├── protocol/       Konsensüs kuralları ve kanonik binary kodlama
-├── node/           Rust validator, REST/SSE API ve kalıcı durum
-├── arduino/        EPDN cihaz kütüphanesi ve ESP32 örnekleri
-├── provisioning/   Cihaz kayıt ve yönetim CLI'ı
-├── gateway/        UART ile node arasında imzalı veri rölesi
-├── indexer/        SQLite okuma modeli ve JSON dışa aktarma
-├── dashboard/      Explorer, cihaz paneli ve yerel cüzdan PWA
-├── scripts/        Testnet çalıştırıcısı ve secret tarayıcısı
-├── tests/          Gizlilik korunmuş donanım kanıtları
-├── docs/           Mimari ve operasyon belgeleri
-├── PROTOCOL.md     Protokol güven sınırı
-├── THREAT_MODEL.md Tehdit modeli
-├── ROADMAP.md      Planlanan geliştirmeler
-└── SECURITY.md     Güvenlik açığı bildirim kuralları
+Embedded_Proof-of-Device_Network/
+├── protocol/       Consensus rules and canonical binary encoding
+├── node/           Rust validator, REST/SSE API, and persistent state
+├── arduino/        EPDN device library and ESP32 examples
+├── provisioning/   Device enrollment and management CLI
+├── gateway/        Signed-data relay between UART and the node
+├── indexer/        SQLite read model and JSON export
+├── dashboard/      Explorer, device panel, and local-wallet PWA
+├── scripts/        Testnet runner and secret scanner
+├── tests/          Privacy-preserving hardware evidence
+├── docs/           Architecture and operations documentation
+├── PROTOCOL.md     Protocol trust boundary
+├── THREAT_MODEL.md Threat model
+├── ROADMAP.md      Planned improvements
+└── SECURITY.md     Vulnerability reporting policy
 ```
 
 ```mermaid
 flowchart TB
-    PROTOCOL["protocol/<br/>Ortak kurallar"] --> NODE["node/<br/>Kuralları uygular"]
-    PROTOCOL --> ARD["arduino/<br/>Uyumlu bilet üretir"]
-    PROV["provisioning/<br/>Kimlik kurar"] --> ARD
-    ARD --> GATE["gateway/<br/>UART rölesi"]
+    PROTOCOL["protocol/<br/>Shared rules"] --> NODE["node/<br/>Enforces the rules"]
+    PROTOCOL --> ARD["arduino/<br/>Produces compatible tickets"]
+    PROV["provisioning/<br/>Establishes identity"] --> ARD
+    ARD --> GATE["gateway/<br/>UART relay"]
     ARD --> NODE
     GATE --> NODE
-    IDX["indexer/<br/>Okuma modeli"] -->|"GET blok listesi"| NODE
-    NODE --> WEB["dashboard/<br/>Explorer ve cüzdan"]
+    IDX["indexer/<br/>Read model"] -->|"GET block list"| NODE
+    NODE --> WEB["dashboard/<br/>Explorer and wallet"]
 ```
 
-<a id="api-ozeti"></a>
-## API özeti
+<a id="api-overview"></a>
+## API overview
 
-Node iki tür endpoint sunar:
+The node exposes two types of endpoints:
 
-| Tür | Örnekler | Yetki |
+| Type | Examples | Authorization |
 |---|---|---|
-| Sağlık/ağ | `/healthz`, `/metrics`, `/api/v1/network/status` | Genel |
-| Epoch ve bilet | `/api/v1/epochs/current`, `/api/v1/tickets` | Challenge genel; bilet kriptografik olarak doğrulanır |
-| Blok ve hesap | `/api/v1/blocks`, `/api/v1/address/{address}` | Genel |
-| Cihaz görünümü | `/api/v1/miners`, `/api/v1/miners/{public_id}` | Genel alanlar |
-| Olay akışı | `/api/v1/events` | Genel SSE |
-| Kayıt ve yönetim | `/api/v1/admin/enroll`, `/api/v1/admin/register`, `/api/v1/admin/miners/{public_id}/revoke` | Admin token'ı |
-| Transfer | `/api/v1/transactions` | Cüzdan imzası |
+| Health/network | `/healthz`, `/metrics`, `/api/v1/network/status` | Public |
+| Epoch and ticket | `/api/v1/epochs/current`, `/api/v1/tickets` | Challenge is public; tickets are cryptographically verified |
+| Block and account | `/api/v1/blocks`, `/api/v1/address/{address}` | Public |
+| Device view | `/api/v1/miners`, `/api/v1/miners/{public_id}` | Public fields |
+| Event stream | `/api/v1/events` | Public SSE |
+| Enrollment and management | `/api/v1/admin/enroll`, `/api/v1/admin/register`, `/api/v1/admin/miners/{public_id}/revoke` | Admin token |
+| Transfer | `/api/v1/transactions` | Wallet signature |
 
-API'lerin tam listesi ve ortam değişkenleri:
+For the complete API list and environment variables, see
 [`node/README.md`](node/README.md).
 
-<a id="testler"></a>
-## Testler ve kalite kapıları
+<a id="tests"></a>
+## Tests and quality gates
 
 ```mermaid
 flowchart LR
     PUSH["Push / Pull Request"] --> RUST["Rust<br/>build + fmt + clippy + test + audit"]
     PUSH --> PY["Python<br/>compile + test + audit"]
     PUSH --> WEB["Dashboard<br/>lint + build + test + audit"]
-    PUSH --> ARD["Arduino<br/>ESP32 derleme matrisi"]
-    PUSH --> SEC["Secret taraması<br/>mevcut ağaç + Git geçmişi"]
-    PUSH --> NET["Yerel testnet<br/>üç süreçli smoke"]
+    PUSH --> ARD["Arduino<br/>ESP32 build matrix"]
+    PUSH --> SEC["Secret scanning<br/>working tree + Git history"]
+    PUSH --> NET["Local testnet<br/>three-process smoke test"]
     PUSH --> DOCKER["Docker<br/>node image build"]
 ```
 
-Yerel temel kontroller:
+Basic local checks:
 
 ```bash
 cargo fmt --all -- --check
@@ -790,121 +803,125 @@ npm run lint
 npm test
 ```
 
-CI ayrıca:
+CI also:
 
-- Rust, Python ve üretim dashboard bağımlılıklarını güvenlik açıklarına karşı
-  tarar.
-- Rust ortak protokol vektörünü doğrular ve Arduino vektör örneğinin
-  derlendiğini kontrol eder.
-- ESP32 örneklerini ve ek ESP32 hedeflerini derler.
-- Üretim build'inde L0 kimliğinin reddedildiğini doğrular.
-- Docker node imajını oluşturur.
+- Scans the Rust, Python, and production dashboard dependencies for
+  vulnerabilities.
+- Verifies the shared Rust protocol vector and confirms that the Arduino vector
+  example builds.
+- Builds the ESP32 examples and additional ESP32 targets.
+- Verifies that production builds reject an L0 identity.
+- Builds the Docker node image.
 
-Detaylar: [`docs/ci.md`](docs/ci.md).
+Details: [`docs/ci.md`](docs/ci.md).
 
-<a id="sinirlar"></a>
-## Bilinen sınırlar
+<a id="limitations"></a>
+## Known limitations
 
-- Çalışan cihaz uygulaması bugün ESP32 merkezlidir; diğer gömülü aileler henüz
-  hazır değildir.
-- Mevcut ESP32 geliştirme kimliği NVS içindeki L0 yazılım anahtarıdır; donanım
-  destekli veya klonlanamaz değildir.
-- Fiziksel Wi-Fi uçtan uca testi yapılmamıştır.
-- İmzalı V3 durum kaydı otomatik testlidir; fiziksel ESP32 ile yeniden başlatma
-  testi V2'de tarihsel olarak geçmiş, V3 fiziksel tekrarı beklemektedir.
-- Tek node geliştirme rastgeleliği güvenli veya tarafsız üretim rastgeleliği
-  değildir.
-- Üç süreçli test gerçek P2P senkronizasyonu veya Byzantine finality sunmaz.
-- Indexer, validator imzasının gerçekliğini bağımsız doğrulamak için henüz
-  yayımlanmış güvenilir validator anahtar checkpoint'ine sahip değildir.
-- Dashboard cüzdanı yerelde şifreler; cüzdan açıkken tarayıcıdaki XSS veya zararlı
-  eklenti imza işlemini kötüye kullanabilir.
-- Üretim provisioning töreni, HSM/çevrimdışı CA, imzalı OTA, rollback ve
-  bağımsız güvenlik denetimi henüz tamamlanmamıştır.
+- The working device implementation is currently centered on ESP32; other
+  embedded families are not ready yet.
+- The current ESP32 development identity is an L0 software key stored in NVS; it
+  is neither hardware-backed nor unclonable.
+- No physical end-to-end Wi-Fi test has been completed.
+- Signed V3 state persistence is covered by automated tests. A physical ESP32
+  restart test historically passed with V2; the physical V3 rerun is still
+  pending.
+- Single-node development randomness is not secure or unbiased production
+  randomness.
+- The current node does not advance epochs on a wall-clock timer; an authorized
+  caller must invoke the epoch-finalization endpoint.
+- The three-process test does not provide real P2P synchronization or Byzantine
+  finality.
+- The indexer does not yet have a published, trusted validator-key checkpoint
+  with which to independently verify the authenticity of validator signatures.
+- The dashboard encrypts the wallet locally. While the wallet is unlocked, XSS
+  in the browser or a malicious extension could misuse signing operations.
+- The production provisioning ceremony, HSM/offline CA, signed OTA, rollback,
+  and independent security audit are not yet complete.
 
-<a id="belgeler"></a>
-## Belgeler
+<a id="documentation"></a>
+## Documentation
 
-### Önce bunları okuyun
+### Read these first
 
-| Belge | Ne zaman okunmalı? |
+| Document | When should you read it? |
 |---|---|
-| [`PROTOCOL.md`](PROTOCOL.md) | Protokolün neyi imzalayıp hash'lediğini anlamak için |
-| [`THREAT_MODEL.md`](THREAT_MODEL.md) | Sistemin neye güvendiğini ve neye karşı korumadığını görmek için |
-| [`docs/architecture.md`](docs/architecture.md) | Bileşen sınırlarını ayrıntılı incelemek için |
-| [`docs/consensus.md`](docs/consensus.md) | PoPED, epoch ve commit/reveal mantığı için |
-| [`SECURITY.md`](SECURITY.md) | Güvenlik açığını özel olarak bildirmek için |
+| [`PROTOCOL.md`](PROTOCOL.md) | To understand what the protocol signs and hashes |
+| [`THREAT_MODEL.md`](THREAT_MODEL.md) | To see what the system trusts and what it does not protect against |
+| [`docs/architecture.md`](docs/architecture.md) | To examine component boundaries in detail |
+| [`docs/consensus.md`](docs/consensus.md) | To understand PoPED, epochs, and commit/reveal logic |
+| [`SECURITY.md`](SECURITY.md) | To report a vulnerability privately |
 
-### Çalıştırma ve operasyon
+### Running and operations
 
-| Belge | Konu |
+| Document | Topic |
 |---|---|
-| [`docs/local-testnet.md`](docs/local-testnet.md) | Yerel node süreçleri ve Docker |
-| [`node/README.md`](node/README.md) | Node yapılandırması, durum formatı ve API |
-| [`arduino/README.md`](arduino/README.md) | Arduino kütüphanesi ve miner örnekleri |
-| [`provisioning/README.md`](provisioning/README.md) | Cihaz kayıt CLI'ı |
+| [`docs/local-testnet.md`](docs/local-testnet.md) | Local node processes and Docker |
+| [`node/README.md`](node/README.md) | Node configuration, state format, and API |
+| [`arduino/README.md`](arduino/README.md) | Arduino library and miner examples |
+| [`provisioning/README.md`](provisioning/README.md) | Device-enrollment CLI |
 | [`gateway/README.md`](gateway/README.md) | UART gateway |
-| [`indexer/README.md`](indexer/README.md) | SQLite indexer ve export |
-| [`dashboard/README.md`](dashboard/README.md) | PWA, cüzdan ve dashboard |
+| [`indexer/README.md`](indexer/README.md) | SQLite indexer and export |
+| [`dashboard/README.md`](dashboard/README.md) | PWA, wallet, and dashboard |
 
-### Donanım ve güvenlik
+### Hardware and security
 
-| Belge | Konu |
+| Document | Topic |
 |---|---|
-| [`docs/supported-boards.md`](docs/supported-boards.md) | Hedeflenen kart aileleri ve yeterlilik yöntemi |
-| [`docs/security-classes.md`](docs/security-classes.md) | L0–L4 sınıfları |
-| [`docs/hardware-testing.md`](docs/hardware-testing.md) | Güvenli fiziksel test sırası |
-| [`docs/wifi-provisioning.md`](docs/wifi-provisioning.md) | Wi-Fi bilgisini kaynak koda koymadan kurulum |
-| [`docs/wallet-security.md`](docs/wallet-security.md) | Tarayıcı cüzdanının güvenlik sınırı |
-| [`docs/production-hardening.md`](docs/production-hardening.md) | Üretime geçmeden önce gerekenler |
-| [`arduino/HARDWARE_TEST_REPORT.md`](arduino/HARDWARE_TEST_REPORT.md) | Gizlilik korunmuş fiziksel test özeti |
+| [`docs/supported-boards.md`](docs/supported-boards.md) | Target board families and qualification method |
+| [`docs/security-classes.md`](docs/security-classes.md) | L0–L4 classes |
+| [`docs/hardware-testing.md`](docs/hardware-testing.md) | Safe physical testing sequence |
+| [`docs/wifi-provisioning.md`](docs/wifi-provisioning.md) | Setup without placing Wi-Fi credentials in source code |
+| [`docs/wallet-security.md`](docs/wallet-security.md) | Browser-wallet security boundary |
+| [`docs/production-hardening.md`](docs/production-hardening.md) | Requirements before production deployment |
+| [`arduino/HARDWARE_TEST_REPORT.md`](arduino/HARDWARE_TEST_REPORT.md) | Privacy-preserving physical test summary |
 
-<a id="yol-haritasi"></a>
-## Yol haritası
+<a id="roadmap"></a>
+## Roadmap
 
-Başlıca hedefler:
+Primary goals:
 
-1. ESP32 dışındaki gömülü aileler için gerçek, test edilen platform adaptörleri.
-2. ATECC608A/ECC508 gibi secure element'larla L3 kimliği.
-3. ESP32 aileleri için doğrulanmış L2 donanım kimliği yolları.
-4. İmzalı ve tekrar üretilebilir OTA, rollback ve measured boot.
-5. HSM destekli CA, çift kontrol ve sertifika yaşam döngüsü.
-6. Gerçek P2P eş senkronizasyonu ve üretim sınıfı finality protokolü.
-7. Uzun süreli fuzzing, güç kesintisi ve depolama aşınma testleri.
-8. Bağımsız protokol ve kriptografi denetimi.
+1. Real, tested platform adapters for embedded families other than ESP32.
+2. L3 identity using secure elements such as ATECC608A/ECC508.
+3. Verified L2 hardware-identity paths for ESP32 families.
+4. Signed and reproducible OTA, rollback, and measured boot.
+5. HSM-backed CA, dual control, and certificate lifecycle management.
+6. Real P2P peer synchronization and a production-grade finality protocol.
+7. Long-running fuzzing, power-loss, and storage-wear testing.
+8. Independent protocol and cryptography audits.
 
-Tam liste: [`ROADMAP.md`](ROADMAP.md).
+Full list: [`ROADMAP.md`](ROADMAP.md).
 
 ```mermaid
 flowchart LR
-    MVP["Bugün<br/>ESP32 merkezli MVP"] --> PORT["Çoklu cihaz adaptörleri"]
-    MVP --> HWKEY["Doğrulanmış donanım anahtarları"]
+    MVP["Today<br/>ESP32-centered MVP"] --> PORT["Multi-device adapters"]
+    MVP --> HWKEY["Verified hardware keys"]
     PORT --> HITL["Hardware-in-the-loop CI"]
-    HWKEY --> AUDIT["Bağımsız güvenlik denetimi"]
-    MVP --> P2P["P2P senkronizasyon ve finality"]
-    HITL --> PROD["Üretim hazırlığı"]
+    HWKEY --> AUDIT["Independent security audit"]
+    MVP --> P2P["P2P synchronization and finality"]
+    HITL --> PROD["Production readiness"]
     AUDIT --> PROD
     P2P --> PROD
 ```
 
-<a id="katki"></a>
-## Katkı ve güvenlik bildirimi
+<a id="contributing"></a>
+## Contributing and security reports
 
-Katkı yapmadan önce:
+Before contributing:
 
-1. Değiştireceğiniz bileşenin README'sini okuyun.
-2. Konsensüs verisini değiştiriyorsanız `PROTOCOL.md` ve binary V1
-   spesifikasyonunu inceleyin.
-3. Yeni kart desteğini “planlı”, “derleme” ve “fiziksel test” kanıtlarıyla ayrı
-   raporlayın.
-4. Özel anahtar, Wi-Fi bilgisi, cihaz kimliği veya ham donanım çıktısı commit
-   etmeyin.
-5. İlgili testleri ve secret taramasını çalıştırın.
+1. Read the README for the component you will change.
+2. If you are changing consensus data, review `PROTOCOL.md` and the binary V1
+   specification.
+3. Report evidence for new board support separately as “planned,” “build,” and
+   “physical test.”
+4. Do not commit private keys, Wi-Fi credentials, device identities, or raw
+   hardware output.
+5. Run the relevant tests and secret scan.
 
-Güvenlik açığını genel issue içinde yayımlamayın. Özel bildirim yöntemi için
-[`SECURITY.md`](SECURITY.md) dosyasını kullanın.
+Do not disclose vulnerabilities in a public issue. Use
+[`SECURITY.md`](SECURITY.md) for private reporting instructions.
 
-<a id="lisans"></a>
-## Lisans
+<a id="license"></a>
+## License
 
-Bu proje [MIT Lisansı](LICENSE) ile yayımlanır.
+This project is released under the [MIT License](LICENSE).
